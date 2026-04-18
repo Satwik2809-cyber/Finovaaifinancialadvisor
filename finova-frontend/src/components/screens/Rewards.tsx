@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { mockBadges } from '../../lib/mockData';
+import { fetchRewards } from '../../lib/api';
+import { Badge as BadgeType } from '../../types';
 import { BadgeCard } from '../BadgeCard';
 import { Progress } from '../ui/progress';
 import { Trophy, Flame } from 'lucide-react';
@@ -11,12 +13,47 @@ const motivationalQuotes = [
   "Financial freedom starts today 🚀"
 ];
 
+const ALL_BADGES = [
+  { id: '1', name: 'First Upload', description: 'Uploaded your first transaction', icon: '📤' },
+  { id: '2', name: 'Smart Saver', description: 'Saved for 7 consecutive days', icon: '💰' },
+  { id: '3', name: 'Debt Dodger', description: 'Zero credit card debt for 30 days', icon: '🛡️' },
+  { id: '4', name: 'Compound Captain', description: 'Completed 10 investment lessons', icon: '📈' },
+  { id: '5', name: 'Budget Boss', description: 'Stayed within budget for 3 months', icon: '👑' },
+  { id: '6', name: 'Goal Getter', description: 'Completed your first savings goal', icon: '🎯' },
+];
+
 export function Rewards() {
-  const streak = 5;
-  const xp = 750;
-  const nextLevelXP = 1000;
-  const level = 3;
-  const unlockedCount = mockBadges.filter(b => b.unlocked).length;
+  const [streak, setStreak] = useState(0);
+  const [xp, setXp] = useState(0);
+  const [unlockedBadges, setUnlockedBadges] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const data = await fetchRewards();
+        setStreak(data.streak || 0);
+        setXp(data.xp || 0);
+        setUnlockedBadges(data.badges || []);
+      } catch(e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  const nextLevelXP = Math.max(100, Math.ceil(xp / 1000) * 1000);
+  const level = Math.floor(xp / 1000) + 1;
+  const unlockedCount = unlockedBadges.length;
+
+  const displayBadges = ALL_BADGES.map(b => ({
+    ...b,
+    unlocked: unlockedBadges.includes(b.name) || false,
+    unlockedDate: 'Recently'
+  }));
+
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
@@ -142,7 +179,7 @@ export function Rewards() {
         <h3 className="mb-4">Your Progress</h3>
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="text-center">
-            <p className="text-3xl mb-1">{unlockedCount}/{mockBadges.length}</p>
+            <p className="text-3xl mb-1">{unlockedCount}/{ALL_BADGES.length}</p>
             <p className="text-sm text-gray-600">Badges Unlocked</p>
           </div>
           <div className="text-center">
@@ -160,7 +197,7 @@ export function Rewards() {
       <div>
         <h3 className="mb-4">Badge Gallery</h3>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {mockBadges.map((badge, index) => (
+          {displayBadges.map((badge, index) => (
             <motion.div
               key={badge.id}
               initial={{ opacity: 0, y: 20 }}

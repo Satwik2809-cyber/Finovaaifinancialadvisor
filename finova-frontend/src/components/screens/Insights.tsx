@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Input } from '../ui/input';
@@ -6,20 +6,55 @@ import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { learningTopics } from '../../lib/mockData';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import { learningTopics, fetchMarketSummary, fetchBehavior } from '../../lib/api';
+import { TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 
-const stockData = [
-  { name: 'NIFTY50', change: '+2.3%', trend: 'up', data: [100, 102, 101, 105, 108, 107, 110] },
-  { name: 'S&P 500', change: '+1.8%', trend: 'up', data: [100, 99, 101, 103, 104, 106, 108] },
-  { name: 'Gold ETF', change: '-0.5%', trend: 'down', data: [100, 102, 101, 99, 98, 97, 99] },
-];
+interface StockData {
+  name: string;
+  symbol: string;
+  current_price: number;
+  percent_change: number;
+  trend: string;
+}
 
 export function Insights() {
   const [sipAmount, setSipAmount] = useState('5000');
   const [sipDuration, setSipDuration] = useState('10');
   const [sipReturn, setSipReturn] = useState('12');
   const [allocation, setAllocation] = useState<'conservative' | 'balanced' | 'aggressive'>('balanced');
+  
+  const [marketData, setMarketData] = useState<StockData[]>([]);
+  const [marketLoading, setMarketLoading] = useState(true);
+  const [behaviorMessage, setBehaviorMessage] = useState<string>("Loading behavior analytics...");
+
+  useEffect(() => {
+    async function loadMarket() {
+      try {
+        const data = await fetchMarketSummary();
+        if (data.summary) {
+          setMarketData(data.summary);
+        }
+      } catch (err) {
+        console.error("Failed to load market data", err);
+      } finally {
+        setMarketLoading(false);
+      }
+    }
+    loadMarket();
+    
+    async function loadBehavior() {
+       try {
+           const data = await fetchBehavior();
+           if (data.message) {
+               setBehaviorMessage(data.message.replace('📊 Behavioral Analytics\\n', '').replace('📊 Behavioral Analytics\n', ''));
+           }
+       } catch (err) {
+           console.error("Failed to load behavior data", err);
+           setBehaviorMessage("Unable to load insights right now. Please test again later.");
+       }
+    }
+    loadBehavior();
+  }, []);
 
   const calculateSIP = () => {
     const P = parseFloat(sipAmount);
@@ -193,35 +228,37 @@ export function Insights() {
       <Card>
         <CardHeader>
           <CardTitle>Market Trends</CardTitle>
-          <CardDescription>Sample tickers for educational purposes</CardDescription>
+          <CardDescription>Live educational intelligence (Nifty, S&P 500, Gold, BTC)</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            {stockData.map((stock) => (
-              <div key={stock.name} className="bg-gray-50 rounded-2xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span>{stock.name}</span>
-                  <span className={`flex items-center gap-1 text-sm ${
-                    stock.trend === 'up' ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {stock.trend === 'up' ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                    {stock.change}
-                  </span>
+          {marketLoading ? (
+            <div className="flex items-center justify-center p-6 text-gray-500">
+               <Loader2 className="w-6 h-6 animate-spin mr-2" />
+               Loading market data...
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-4">
+              {marketData.length > 0 ? marketData.map((stock) => (
+                <div key={stock.symbol} className="bg-gray-50 rounded-2xl p-4">
+                  <div className="flex flex-col mb-3">
+                    <span className="font-semibold">{stock.name}</span>
+                    <span className="text-sm text-gray-500">{stock.symbol}</span>
+                  </div>
+                  <div className="flex items-end justify-between mt-2">
+                     <span className="text-xl font-bold">${stock.current_price}</span>
+                     <span className={`flex items-center gap-1 text-sm ${
+                       stock.trend === 'up' ? 'text-green-600' : 'text-red-600'
+                     }`}>
+                       {stock.trend === 'up' ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                       {stock.percent_change > 0 ? '+' : ''}{stock.percent_change}%
+                     </span>
+                  </div>
                 </div>
-                <ResponsiveContainer width="100%" height={60}>
-                  <LineChart data={stock.data.map((v, i) => ({ value: v }))}>
-                    <Line
-                      type="monotone"
-                      dataKey="value"
-                      stroke={stock.trend === 'up' ? '#10B981' : '#EF4444'}
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            ))}
-          </div>
+              )) : (
+                <p className="text-gray-500">No market data available.</p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -232,9 +269,8 @@ export function Insights() {
         className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-3xl p-6 border-2 border-purple-200"
       >
         <h3 className="mb-2">📊 Behavioral Analytics</h3>
-        <p className="text-sm text-gray-600">
-          You tend to save more mid-month — great habit! Consider setting up an automatic transfer 
-          on the 15th to maximize this pattern.
+        <p className="text-sm text-gray-600 whitespace-pre-line">
+          {behaviorMessage}
         </p>
       </motion.div>
 

@@ -7,14 +7,8 @@ import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Avatar, AvatarFallback } from '../ui/avatar';
 import { Send, Mic } from 'lucide-react';
-import { quickQuestions } from '../../lib/mockData';
+import { quickQuestions, askFinovaChatbot } from '../../lib/api';
 
-const aiResponses: Record<string, string> = {
-  'What is SIP?': 'SIP (Systematic Investment Plan) is a way to invest a fixed amount regularly in mutual funds. It helps build wealth through rupee cost averaging and compounding. Start with as little as ₹500/month!',
-  'How can I budget ₹10,000?': 'Here\'s a smart breakdown using the 50/30/20 rule:\n• ₹5,000 (50%) - Needs (food, transport)\n• ₹3,000 (30%) - Wants (entertainment, dining out)\n• ₹2,000 (20%) - Savings/Investments\nAdjust based on your priorities!',
-  'Why did my health score drop?': 'Your score dropped because:\n1. Food spending increased by 35% this week\n2. You spent 70% of your budget by the 10th\n3. No savings added in the last 7 days\n\nTip: Set up automatic savings transfers!',
-  "What's the 50/30/20 rule?": 'The 50/30/20 rule is a simple budgeting framework:\n• 50% of income → Needs (rent, utilities, groceries)\n• 30% → Wants (dining out, hobbies, entertainment)\n• 20% → Savings & Investments\nIt helps balance lifestyle with financial security!'
-};
 
 export function Chat() {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -52,20 +46,30 @@ export function Chat() {
     setInputValue('');
     setIsTyping(true);
 
-    setTimeout(() => {
-      const aiResponse = aiResponses[message] || 
-        `That's a great question! As your ${tone}, I'd say: Focus on building good financial habits. Track your expenses, save regularly, and invest wisely. Remember, small steps lead to big results! 💪`;
+      try {
+        askFinovaChatbot(message, tone).then((res) => {
+          const aiMessage: ChatMessage = {
+            id: (Date.now() + 1).toString(),
+            type: 'ai',
+            content: res.response || "Sorry, I couldn't process that right now.",
+            timestamp: new Date()
+          };
 
-      const aiMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        type: 'ai',
-        content: aiResponse,
-        timestamp: new Date()
-      };
-
-      setMessages(prev => [...prev, aiMessage]);
-      setIsTyping(false);
-    }, 1500);
+          setMessages(prev => [...prev, aiMessage]);
+        }).catch(err => {
+          const errorMsg: ChatMessage = {
+            id: (Date.now() + 1).toString(),
+            type: 'ai',
+            content: "Oops! Connection to backend failed.",
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, errorMsg]);
+        }).finally(() => {
+          setIsTyping(false);
+        });
+      } catch (e) {
+        setIsTyping(false);
+      }    
   };
 
   return (

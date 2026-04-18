@@ -1,7 +1,12 @@
+import { useState } from 'react';
 import { motion } from 'motion/react';
 import { Goal } from '../types';
 import { Progress } from './ui/progress';
 import { Calendar } from 'lucide-react';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { addSavingsToGoal } from '../lib/api';
+import { toast } from 'sonner';
 
 interface GoalCardProps {
   goal: Goal;
@@ -9,8 +14,26 @@ interface GoalCardProps {
 }
 
 export function GoalCard({ goal, onComplete }: GoalCardProps) {
-  const progress = (goal.currentAmount / goal.amount) * 100;
+  const [addAmount, setAddAmount] = useState('');
+  const [currentSaved, setCurrentSaved] = useState(goal.currentAmount);
+
+  const progress = (currentSaved / goal.amount) * 100;
   const isCompleted = progress >= 100;
+
+  const handleAddSavings = async () => {
+    if (!addAmount || isNaN(Number(addAmount))) return;
+    try {
+      const res = await addSavingsToGoal(goal.id, Number(addAmount));
+      setCurrentSaved(res.new_saved);
+      toast.success(`Added ₹${addAmount} to ${goal.name}!`);
+      setAddAmount('');
+      if (res.new_saved >= goal.amount && onComplete) {
+         onComplete();
+      }
+    } catch(err) {
+      toast.error('Failed to add savings');
+    }
+  };
 
   return (
     <motion.div
@@ -72,7 +95,7 @@ export function GoalCard({ goal, onComplete }: GoalCardProps) {
               animate={{ scale: 1 }}
               transition={{ delay: 0.2, type: 'spring' }}
             >
-              ₹{goal.currentAmount.toLocaleString()}
+              ₹{currentSaved.toLocaleString()}
             </motion.span>
             <span className="text-sm text-white/90">of ₹{goal.amount.toLocaleString()}</span>
           </div>
@@ -105,7 +128,7 @@ export function GoalCard({ goal, onComplete }: GoalCardProps) {
           </motion.span>
         </div>
 
-        {isCompleted && (
+        {isCompleted ? (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -113,6 +136,22 @@ export function GoalCard({ goal, onComplete }: GoalCardProps) {
           >
             🎊 Goal Achieved! Your dreams are now funded 💪
           </motion.div>
+        ) : (
+          <div className="mt-4 flex flex-col gap-2 relative z-10 bg-white/10 p-3 rounded-xl backdrop-blur-sm">
+             <span className="text-xs font-semibold uppercase tracking-wider text-white/90">Add Savings</span>
+             <div className="flex gap-2">
+                 <Input 
+                   value={addAmount} 
+                   onChange={e => setAddAmount(e.target.value)} 
+                   type="number" 
+                   placeholder="₹ Amount" 
+                   className="bg-white/20 border-white/30 text-white placeholder:text-white/70 h-9 flex-1" 
+                 />
+                 <Button onClick={handleAddSavings} size="sm" variant="secondary" className="bg-white text-black hover:bg-white/90 font-bold h-9">
+                     Save
+                 </Button>
+             </div>
+          </div>
         )}
       </div>
     </motion.div>

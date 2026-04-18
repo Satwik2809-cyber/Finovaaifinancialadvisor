@@ -1,25 +1,74 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { HealthScoreCard } from '../HealthScoreCard';
 import { SpendingChart } from '../SpendingChart';
 import { CashflowChart } from '../CashflowChart';
 import { NudgeCard } from '../NudgeCard';
 import { GoalCard } from '../GoalCard';
-import { mockSpendingCategories, mockNudges, mockGoals, mockBadges } from '../../lib/mockData';
+import { fetchHealthScore, fetchRewards, fetchNudges, fetchGoals, fetchInsightsSpending, fetchProfile } from '../../lib/api';
 import { Button } from '../ui/button';
 import { Upload, Sparkles, Target } from 'lucide-react';
 import { Badge } from '../ui/badge';
+import { Goal, Nudge, SpendingCategory, Badge as BadgeType } from '../../types';
 
 interface DashboardProps {
   onNavigate: (tab: string) => void;
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
-  const [userName] = useState('Satwik');
-  const [healthScore] = useState(78);
-  const [streak] = useState(5);
+  const [userName, setUserName] = useState('User');
+  const [healthScore, setHealthScore] = useState(70);
+  const [streak, setStreak] = useState(0);
+  const [unlockedBadges, setUnlockedBadges] = useState<{id:string; name:string; icon:string}[]>([]);
+  const [nudges, setNudges] = useState<Nudge[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [spendingCategories, setSpendingCategories] = useState<SpendingCategory[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const unlockedBadges = mockBadges.filter(b => b.unlocked);
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [profileRes, scoreRes, rewardsRes, nudgesRes, goalsRes, spendingRes] = await Promise.all([
+          fetchProfile().catch(() => ({ name: 'User' })),
+          fetchHealthScore().catch(() => ({ score: 70 })),
+          fetchRewards().catch(() => ({ streak: 0, badges: [] })),
+          fetchNudges().catch(() => ({ nudges: [] })),
+          fetchGoals().catch(() => []),
+          fetchInsightsSpending().catch(() => [])
+        ]);
+
+        if (profileRes.name) setUserName(profileRes.name);
+        setHealthScore(scoreRes.score || 70);
+        setStreak(rewardsRes.streak || 0);
+        
+        // Map badges correctly based on names
+        const loadedBadges = Array.isArray(rewardsRes.badges) ? rewardsRes.badges.map((b: string) => ({
+          id: b, name: b, icon: '🏆'
+        })) : [];
+        setUnlockedBadges(loadedBadges);
+
+        setNudges(nudgesRes.nudges || []);
+        
+        setGoals(goalsRes.map((g: any) => ({
+          id: g.id.toString(),
+          name: g.title,
+          amount: g.target,
+          currentAmount: g.saved,
+          deadline: g.deadline,
+          purpose: 'Saved so far',
+          color: 'from-blue-400 to-cyan-400'
+        })));
+        
+        setSpendingCategories(spendingRes);
+
+      } catch (err) {
+        console.error("Failed to fetch dashboard data:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
@@ -77,6 +126,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <Button 
             variant="outline" 
             className="gap-2 whitespace-nowrap border-2 border-[#4BE1C3]/30 hover:bg-[#4BE1C3]/10 hover:border-[#4BE1C3] shadow-md hover:shadow-lg transition-all"
+            onClick={() => onNavigate('transactions')}
           >
             <Upload className="w-4 h-4" />
             Upload CSV
@@ -176,13 +226,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       {/* Smart Nudges */}
       <div className="space-y-3">
         <h3>Smart Nudges & Alerts</h3>
-        {mockNudges.map((nudge) => (
-          <NudgeCard key={nudge.id} nudge={nudge} />
+        {nudges.length === 0 && <p className="text-gray-500 text-sm">No new nudges. You're doing great!</p>}
+        {nudges.map((nudge, idx) => (
+          <NudgeCard key={nudge.id || idx} nudge={nudge} />
         ))}
       </div>
 
       {/* Spending Breakdown */}
-      <SpendingChart data={mockSpendingCategories} />
+      <SpendingChart data={spendingCategories} />
 
       {/* Goals Summary */}
       <div>
@@ -197,7 +248,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </Button>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
-          {mockGoals.slice(0, 2).map((goal) => (
+          {goals.length === 0 && <p className="text-gray-500 text-sm">No active goals yet. Start saving!</p>}
+          {goals.slice(0, 2).map((goal) => (
             <GoalCard key={goal.id} goal={goal} />
           ))}
         </div>

@@ -1,16 +1,29 @@
+import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import { motion } from 'motion/react';
-import { TrendingDown } from 'lucide-react';
-
-const forecastData = [
-  { day: 'Today', balance: 25000 },
-  { day: '7d', balance: 22000 },
-  { day: '14d', balance: 19500 },
-  { day: '21d', balance: 17800 },
-  { day: '30d', balance: 15200 },
-];
+import { TrendingDown, Loader2 } from 'lucide-react';
+import { fetchCashflow } from '../lib/api';
 
 export function CashflowChart() {
+  const [forecastData, setForecastData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchCashflow()
+      .then(data => setForecastData(data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-6 text-gray-500 bg-white rounded-3xl shadow-lg h-64 border-2 border-transparent">
+        <Loader2 className="w-6 h-6 animate-spin mr-2" />
+        Loading forecast...
+      </div>
+    );
+  }
+
   return (
     <motion.div 
       className="bg-gradient-to-br from-white to-blue-50/30 rounded-3xl p-6 shadow-lg hover:shadow-xl transition-all border-2 border-transparent hover:border-[#4BE1C3]/20 relative overflow-hidden"

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { mockGoals } from '../../lib/mockData';
+import { fetchGoals, addGoal } from '../../lib/api';
 import { Goal } from '../../types';
 import { GoalCard } from '../GoalCard';
 import { Button } from '../ui/button';
@@ -11,7 +11,31 @@ import { Plus, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function Goals() {
-  const [goals, setGoals] = useState<Goal[]>(mockGoals);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const goalsRes = await fetchGoals();
+        setGoals(goalsRes.map((g: any) => ({
+          id: g.id.toString(),
+          name: g.title,
+          amount: g.target,
+          currentAmount: g.saved,
+          deadline: g.deadline,
+          purpose: 'Saved so far',
+          color: 'from-blue-400 to-cyan-400'
+        })));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
   const [showConfetti, setShowConfetti] = useState(false);
   const [roundUpSavings] = useState(12);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -42,24 +66,31 @@ export function Goals() {
       'from-violet-500 to-purple-600',
     ];
 
-    const newGoalData: Goal = {
-      id: Date.now().toString(),
-      name: newGoal.name,
-      amount: parseFloat(newGoal.amount),
-      currentAmount: 0,
+    addGoal({
+      title: newGoal.name,
+      target: parseFloat(newGoal.amount),
+      saved: 0,
       deadline: newGoal.deadline,
-      purpose: newGoal.purpose || 'Saving for my goal',
-      color: goalColors[Math.floor(Math.random() * goalColors.length)]
-    };
-
-    setGoals(prev => [...prev, newGoalData]);
-    setNewGoal({ name: '', amount: '', deadline: '', purpose: '' });
-    setIsDialogOpen(false);
-    
-    // Show success message
-    toast.success(`🎯 Goal "${newGoal.name}" created successfully!`);
-    setShowConfetti(true);
-    setTimeout(() => setShowConfetti(false), 2000);
+      vault_type: 'general'
+    }).then(res => {
+      const newGoalData: Goal = {
+        id: Date.now().toString(),
+        name: newGoal.name,
+        amount: parseFloat(newGoal.amount),
+        currentAmount: 0,
+        deadline: newGoal.deadline,
+        purpose: newGoal.purpose || 'Saving for my goal',
+        color: goalColors[Math.floor(Math.random() * goalColors.length)]
+      };
+      setGoals(prev => [...prev, newGoalData]);
+      setNewGoal({ name: '', amount: '', deadline: '', purpose: '' });
+      setIsDialogOpen(false);
+      
+      // Show success message
+      toast.success(`🎯 Goal "${newGoal.name}" created successfully! XP Earned!`);
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 2000);
+    }).catch(err => toast.error('Failed to save goal'));
   };
 
   return (
@@ -192,8 +223,17 @@ export function Goals() {
           <div>
             <h4>AI Tip</h4>
             <p className="text-sm text-gray-600 mt-1">
-              Your Goa Trip goal could benefit from a short-term SIP investment. With 40% already saved, 
-              consider investing in a liquid fund to earn ~6-7% returns while keeping funds accessible.
+              {goals.length === 0 
+                ? "Start by setting a new financial goal above! Setting clear targets increases your chance of saving successfully."
+                : (() => {
+                    const topGoal = goals[0];
+                    const progress = (topGoal.currentAmount / topGoal.amount) * 100;
+                    if (progress >= 100) return `Amazing job completing your ${topGoal.name} goal! Consider investing the excess or starting a new goal.`;
+                    if (progress > 50) return `You're more than halfway to your ${topGoal.name} goal! Consider putting ${topGoal.name} savings into a high-yield account to earn extra interest before the deadline.`;
+                    if (progress > 0) return `Your ${topGoal.name} goal is off to a great start with ${Math.round(progress)}% saved. Try setting up an automatic weekly transfer to hit it faster!`;
+                    return `You just started your ${topGoal.name} goal. Every small contribution counts. Use the 'Add Savings' button on the card to log your progress!`;
+                  })()
+              }
             </p>
           </div>
         </div>

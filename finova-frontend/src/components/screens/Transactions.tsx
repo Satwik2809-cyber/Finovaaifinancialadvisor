@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { mockTransactions } from '../../lib/mockData';
+import { fetchTransactions, uploadTransactionsCSV, autoClassifyTransactions } from '../../lib/api';
 import { Transaction } from '../../types';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -19,9 +19,53 @@ const categoryColors: Record<string, string> = {
 };
 
 export function Transactions() {
-  const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [loading, setLoading] = useState(true);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchTransactions();
+      setTransactions(data.map((t: any) => ({ ...t, id: t.id.toString(), date: t.date })));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setLoading(true);
+      await uploadTransactionsCSV(file);
+      await loadData();
+    } catch (err) {
+      console.error("Failed to upload CSV:", err);
+      alert("Failed to upload CSV. Please try again.");
+    }
+  };
+
+  const handleAutoClassify = async () => {
+    try {
+      setLoading(true);
+      await autoClassifyTransactions();
+      await loadData();
+    } catch (err) {
+      console.error("Failed to auto classify", err);
+      alert("Failed to run AI classification.");
+    }
+  };
 
   const filteredTransactions = transactions.filter(t => {
     const matchesSearch = t.merchant.toLowerCase().includes(searchQuery.toLowerCase());
@@ -46,11 +90,27 @@ export function Transactions() {
 
       {/* Actions */}
       <div className="flex gap-3 flex-wrap">
-        <Button className="gap-2 bg-[#4BE1C3] hover:bg-[#4BE1C3]/90">
+        <input 
+          type="file" 
+          accept=".csv" 
+          ref={fileInputRef} 
+          style={{ display: 'none' }} 
+          onChange={handleFileUpload} 
+        />
+        <Button 
+          className="gap-2 bg-[#4BE1C3] hover:bg-[#4BE1C3]/90"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={loading}
+        >
           <Upload className="w-4 h-4" />
-          Upload CSV 📤
+          {loading ? 'Processing...' : 'Upload CSV 📤'}
         </Button>
-        <Button variant="outline" className="gap-2">
+        <Button 
+          variant="outline" 
+          className="gap-2"
+          onClick={handleAutoClassify}
+          disabled={loading}
+        >
           <Sparkles className="w-4 h-4" />
           Auto-label with AI 🤖
         </Button>

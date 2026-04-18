@@ -1,0 +1,11 @@
+date,merchant,amount,category,description
+2026-04-17,Starbucks,350.0,Food,Morning Coffee
+2026-04-15,Uber,450.0,Travel,Office Ride
+2026-04-08,Zomato,800.0,Food,Lunch
+2026-04-06,Amazon,2500.0,Shopping,Headphones
+2026-04-13,Electricity Board,1200.0,Bills,Monthly Electricity
+2026-04-08,Netflix,499.0,Entertainment,Subscription
+2026-04-10,Myntra,3200.0,Shopping,Clothes
+2026-04-16,IRCTC,1800.0,Travel,Train Ticket
+2026-04-14,Local Grocery,950.0,Food,Groceries
+2026-04-18,Spotify,119.0,Entertainment,Music Subscription
